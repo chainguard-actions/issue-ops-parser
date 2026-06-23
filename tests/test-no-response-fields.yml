@@ -1,0 +1,85 @@
+name: Test parsing with no-response fields
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### Required Field
+
+            some-value
+
+            ### Optional Field
+
+            _No response_
+
+            ### Description
+
+            This is a multiline description.
+
+            It has multiple paragraphs.
+          workspace: ${{ github.workspace }}
+
+      - name: Assert JSON output is not empty
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          if [ -z "$JSON_OUTPUT" ]; then
+            echo "FAIL: json output is empty"
+            exit 1
+          fi
+          echo "PASS: json output is not empty"
+
+      - name: Assert required field is parsed correctly
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          VALUE=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('required_field',''))")
+          echo "required_field: $VALUE"
+          if [ "$VALUE" != "some-value" ]; then
+            echo "FAIL: expected 'some-value', got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert no-response field is preserved
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          VALUE=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('optional_field',''))")
+          echo "optional_field: $VALUE"
+          if [ "$VALUE" != "_No response_" ]; then
+            echo "FAIL: expected '_No response_', got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert multiline description is parsed correctly
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          VALUE=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('description',''))")
+          echo "description: $VALUE"
+          if [ -z "$VALUE" ]; then
+            echo "FAIL: description is empty"
+            exit 1
+          fi
+          if ! echo "$VALUE" | grep -q "multiline description"; then
+            echo "FAIL: description does not contain expected text"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert output is valid JSON
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "$JSON_OUTPUT" | python3 -c "import sys, json; json.load(sys.stdin); print('PASS: valid JSON')"

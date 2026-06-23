@@ -1,0 +1,115 @@
+name: Test parsing with issue form template
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create issue form template
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.github/ISSUE_TEMPLATE"
+          cat > "$GITHUB_WORKSPACE/.github/ISSUE_TEMPLATE/test-template.yml" << 'EOF'
+          name: Test Request
+          description: A test request form
+          title: '[Test] Request'
+          body:
+            - type: input
+              id: name
+              attributes:
+                label: The Name of the Thing
+                description: The name of the thing.
+                placeholder: this-is-the-thing
+              validations:
+                required: true
+            - type: dropdown
+              id: color
+              attributes:
+                label: The Color of the Thing
+                description: The color of the thing.
+                multiple: false
+                options:
+                  - blue
+                  - red
+                  - green
+              validations:
+                required: true
+            - type: checkboxes
+              id: is-thing
+              attributes:
+                label: Is the Thing a Thing?
+                description: Is the thing a thing?
+                options:
+                  - label: 'Yes'
+                    required: true
+                  - label: 'No'
+                    required: false
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### The Name of the Thing
+
+            my-test-thing
+
+            ### The Color of the Thing
+
+            blue
+
+            ### Is the Thing a Thing?
+
+            - [x] Yes
+            - [ ] No
+          issue-form-template: test-template.yml
+          workspace: ${{ github.workspace }}
+
+      - name: Assert JSON output is not empty
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          if [ -z "$JSON_OUTPUT" ]; then
+            echo "FAIL: json output is empty"
+            exit 1
+          fi
+          echo "PASS: json output is not empty"
+
+      - name: Assert name field is parsed correctly
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          NAME=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('name',''))")
+          echo "name: $NAME"
+          if [ "$NAME" != "my-test-thing" ]; then
+            echo "FAIL: expected 'my-test-thing', got '$NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert color field is parsed as array (dropdown with template)
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          COLOR=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('color','')))")
+          echo "color: $COLOR"
+          if [ "$COLOR" != '["blue"]' ]; then
+            echo "FAIL: expected '[\"blue\"]', got '$COLOR'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert checkbox field is parsed with selected/unselected
+        env:
+          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+        run: |
+          SELECTED=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('is-thing',{}).get('selected',[])))")
+          echo "selected: $SELECTED"
+          if [ "$SELECTED" != '["Yes"]' ]; then
+            echo "FAIL: expected '[\"Yes\"]', got '$SELECTED'"
+            exit 1
+          fi
+          echo "PASS"
