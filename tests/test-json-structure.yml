@@ -1,0 +1,95 @@
+name: Test JSON output structure
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: parser
+        uses: .
+        with:
+          body: |
+            ### Name
+
+            test-thing
+
+            ### Description
+
+            A test description.
+
+            ### Color
+
+            green
+
+            ### Confirmation
+
+            - [x] I confirm this request
+          issue-form-template: simple-request.yml
+          workspace: ${{ github.workspace }}/tests/fixtures
+
+      - name: Assert output is valid JSON
+        env:
+          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          if ! echo "$JSON_OUTPUT" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
+            echo "FAIL: output is not valid JSON"
+            exit 1
+          fi
+          echo "PASS: output is valid JSON"
+
+      - name: Assert JSON contains expected keys
+        env:
+          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          # Check that all expected keys are present
+          for key in name description color confirm; do
+            if ! echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); assert '$key' in d, 'missing key: $key'" 2>&1; then
+              echo "FAIL: missing expected key '$key' in JSON output"
+              exit 1
+            fi
+          done
+          echo "PASS: all expected keys present in JSON output"
+
+      - name: Assert name value is correct
+        env:
+          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          NAME=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['name'])")
+          echo "name: $NAME"
+          if [ "$NAME" != "test-thing" ]; then
+            echo "FAIL: expected name='test-thing', got '$NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert description value is correct
+        env:
+          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          DESC=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['description'])")
+          echo "description: $DESC"
+          if [ "$DESC" != "A test description." ]; then
+            echo "FAIL: expected description='A test description.', got '$DESC'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert color is array with green
+        env:
+          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUTPUT"
+          COLOR=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['color'])")
+          echo "color: $COLOR"
+          if [ "$COLOR" != "['green']" ]; then
+            echo "FAIL: expected color=['green'], got '$COLOR'"
+            exit 1
+          fi
+          echo "PASS"
