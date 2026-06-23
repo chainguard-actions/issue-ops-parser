@@ -1,0 +1,64 @@
+name: Test - Parse Issue Body Without Template
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### The Name of the Thing
+
+            this-thing
+
+            ### The Color of the Thing
+
+            blue
+
+            ### Is the Thing a Thing?
+
+            - [x] Yes
+            - [ ] No
+          workspace: ${{ github.workspace }}
+
+      - name: Assert json output is not empty
+        env:
+          JSON: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json: $JSON"
+          if [ -z "$JSON" ]; then
+            echo "FAIL: json output is empty"
+            exit 1
+          fi
+          echo "PASS: json output is not empty"
+
+      - name: Assert name field is parsed correctly
+        env:
+          JSON: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json: $JSON"
+          NAME=$(echo "$JSON" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('the_name_of_the_thing',''))")
+          echo "name: $NAME"
+          if [ "$NAME" != "this-thing" ]; then
+            echo "FAIL: expected 'this-thing', got '$NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert color field is parsed correctly
+        env:
+          JSON: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json: $JSON"
+          COLOR=$(echo "$JSON" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('the_color_of_the_thing',''))")
+          echo "color: $COLOR"
+          if [ "$COLOR" != "blue" ]; then
+            echo "FAIL: expected 'blue', got '$COLOR'"
+            exit 1
+          fi
+          echo "PASS"
