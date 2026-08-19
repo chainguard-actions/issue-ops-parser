@@ -1,0 +1,40 @@
+name: Test Request
+description: A simple test request form
+title: '[Test] Request'
+
+body:
+  - type: input
+    id: project-name
+    attributes:
+      label: Project Name
+      description: The name of the project.
+      placeholder: my-project
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A description of the project.
+      placeholder: This is a description.
+    validations:
+      required: false
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: The target environment.
+      multiple: false
+      options:
+        - dev
+        - staging
+        - prod
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmed
+    attributes:
+      label: Confirmation
+      options:
+        - label: I confirm this request
+          required: true

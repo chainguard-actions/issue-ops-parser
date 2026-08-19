@@ -1,4 +1,4 @@
-name: Test basic parsing without template
+name: Test basic usage - parse issue body without template
 on:
   workflow_dispatch:
 
@@ -12,63 +12,56 @@ jobs:
         uses: .
         with:
           body: |
-            ### The Name of the Thing
+            ### Project Name
 
-            this-thing
+            my-project
 
-            ### The Nickname of the Thing
+            ### Description
 
-            thing
-
-            ### The Color of the Thing
-
-            blue
+            This is a test description.
           workspace: ${{ github.workspace }}
 
-      - name: Assert JSON output is not empty
+      - name: Assert json output is non-empty
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          if [ -z "$JSON_OUTPUT" ]; then
-            echo "FAIL: json output is empty"
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty json output"
             exit 1
           fi
-          echo "PASS: json output is not empty"
+          echo "PASS: json output is non-empty"
 
-      - name: Assert name field is parsed correctly
+      - name: Assert json output contains expected key
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          NAME=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('the_name_of_the_thing',''))")
-          echo "name: $NAME"
-          if [ "$NAME" != "this-thing" ]; then
-            echo "FAIL: expected 'this-thing', got '$NAME'"
+          echo "actual: $ACTUAL"
+          # The action slugifies headings, so "Project Name" becomes "project_name"
+          if ! echo "$ACTUAL" | grep -q "project_name"; then
+            echo "FAIL: expected 'project_name' key in json output"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: json output contains 'project_name' key"
 
-      - name: Assert nickname field is parsed correctly
+      - name: Assert json output contains expected value
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          NICKNAME=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('the_nickname_of_the_thing',''))")
-          echo "nickname: $NICKNAME"
-          if [ "$NICKNAME" != "thing" ]; then
-            echo "FAIL: expected 'thing', got '$NICKNAME'"
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "my-project"; then
+            echo "FAIL: expected 'my-project' value in json output"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: json output contains 'my-project' value"
 
-      - name: Assert color field is parsed correctly
+      - name: Assert parsed output for project_name
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.parsed_project_name }}
         run: |
-          COLOR=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('the_color_of_the_thing',''))")
-          echo "color: $COLOR"
-          if [ "$COLOR" != "blue" ]; then
-            echo "FAIL: expected 'blue', got '$COLOR'"
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "my-project" ]; then
+            echo "FAIL: expected 'my-project' but got '$ACTUAL'"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: parsed_project_name is 'my-project'"

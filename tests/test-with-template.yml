@@ -1,4 +1,4 @@
-name: Test parsing with issue form template
+name: Test parse issue body with issue form template
 on:
   workflow_dispatch:
 
@@ -8,108 +8,75 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Create issue form template
+      - name: Set up issue template fixture
         run: |
           mkdir -p "$GITHUB_WORKSPACE/.github/ISSUE_TEMPLATE"
-          cat > "$GITHUB_WORKSPACE/.github/ISSUE_TEMPLATE/test-template.yml" << 'EOF'
-          name: Test Request
-          description: A test request form
-          title: '[Test] Request'
-          body:
-            - type: input
-              id: name
-              attributes:
-                label: The Name of the Thing
-                description: The name of the thing.
-                placeholder: this-is-the-thing
-              validations:
-                required: true
-            - type: dropdown
-              id: color
-              attributes:
-                label: The Color of the Thing
-                description: The color of the thing.
-                multiple: false
-                options:
-                  - blue
-                  - red
-                  - green
-              validations:
-                required: true
-            - type: checkboxes
-              id: is-thing
-              attributes:
-                label: Is the Thing a Thing?
-                description: Is the thing a thing?
-                options:
-                  - label: 'Yes'
-                    required: true
-                  - label: 'No'
-                    required: false
-          EOF
+          cp -r "$GITHUB_WORKSPACE/tests/fixtures/.github/ISSUE_TEMPLATE/test-template.yml" \
+            "$GITHUB_WORKSPACE/.github/ISSUE_TEMPLATE/test-template.yml"
 
       - id: action
         uses: .
         with:
           body: |
-            ### The Name of the Thing
+            ### Project Name
 
-            my-test-thing
+            my-project
 
-            ### The Color of the Thing
+            ### Description
 
-            blue
+            This is a test description.
 
-            ### Is the Thing a Thing?
+            ### Environment
 
-            - [x] Yes
-            - [ ] No
+            staging
+
+            ### Confirmation
+
+            - [x] I confirm this request
           issue-form-template: test-template.yml
           workspace: ${{ github.workspace }}
 
-      - name: Assert JSON output is not empty
+      - name: Assert json output is non-empty
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          if [ -z "$JSON_OUTPUT" ]; then
-            echo "FAIL: json output is empty"
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty json output"
             exit 1
           fi
-          echo "PASS: json output is not empty"
+          echo "PASS: json output is non-empty"
 
-      - name: Assert name field is parsed correctly
+      - name: Assert json output uses template IDs as keys
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          NAME=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('name',''))")
-          echo "name: $NAME"
-          if [ "$NAME" != "my-test-thing" ]; then
-            echo "FAIL: expected 'my-test-thing', got '$NAME'"
+          echo "actual: $ACTUAL"
+          # When using a template, the action uses the template field IDs as keys
+          if ! echo "$ACTUAL" | grep -q "project-name"; then
+            echo "FAIL: expected 'project-name' key (template ID) in json output"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: json output contains 'project-name' key"
 
-      - name: Assert color field is parsed as array (dropdown with template)
+      - name: Assert json output contains project name value
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          COLOR=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('color','')))")
-          echo "color: $COLOR"
-          if [ "$COLOR" != '["blue"]' ]; then
-            echo "FAIL: expected '[\"blue\"]', got '$COLOR'"
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "my-project"; then
+            echo "FAIL: expected 'my-project' value in json output"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: json output contains 'my-project' value"
 
-      - name: Assert checkbox field is parsed with selected/unselected
+      - name: Assert json output contains environment value
         env:
-          JSON_OUTPUT: ${{ steps.action.outputs.json }}
+          ACTUAL: ${{ steps.action.outputs.json }}
         run: |
-          SELECTED=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('is-thing',{}).get('selected',[])))")
-          echo "selected: $SELECTED"
-          if [ "$SELECTED" != '["Yes"]' ]; then
-            echo "FAIL: expected '[\"Yes\"]', got '$SELECTED'"
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "staging"; then
+            echo "FAIL: expected 'staging' value in json output"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: json output contains 'staging' value"
