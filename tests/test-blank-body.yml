@@ -1,0 +1,44 @@
+name: Test parse issue body with no recognizable sections
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: "This body has no issue form sections."
+          workspace: ${{ github.workspace }}
+
+      - name: Assert JSON output is empty object or empty
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          # Normalize whitespace
+          NORM="$(echo "$ACTUAL" | tr -d '[:space:]')"
+          echo "normalized: $NORM"
+          # Accept empty string, {}, or null as valid "no content" results
+          if [ -z "$NORM" ] || [ "$NORM" = "{}" ] || [ "$NORM" = "null" ]; then
+            echo "PASS: body with no sections produces empty/null JSON"
+          else
+            echo "FAIL: expected empty/null JSON for body with no sections, got '$NORM'"
+            exit 1
+          fi
+
+      - name: Assert JSON is valid JSON (if non-empty)
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "PASS: output is empty (no JSON to validate)"
+          elif ! echo "$ACTUAL" | python3 -c "import sys, json; json.load(sys.stdin)"; then
+            echo "FAIL: output is not valid JSON"
+            exit 1
+          else
+            echo "PASS: output is valid JSON"
+          fi

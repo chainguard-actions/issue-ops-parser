@@ -1,0 +1,38 @@
+name: New Repository Request
+description: Request a new repository
+title: '[Request] New Repository'
+body:
+  - type: input
+    id: repo-name
+    attributes:
+      label: Repository Name
+      description: The name of the repository.
+      placeholder: my-new-repo
+    validations:
+      required: true
+  - type: dropdown
+    id: visibility
+    attributes:
+      label: Visibility
+      description: The visibility of the repository.
+      multiple: false
+      options:
+        - public
+        - private
+        - internal
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A short description of the repository.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirm
+      options:
+        - label: I confirm this request is valid
+          required: true
