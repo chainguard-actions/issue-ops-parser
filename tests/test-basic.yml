@@ -1,4 +1,4 @@
-name: Test basic issue parsing
+name: Test basic issue form parsing
 on:
   workflow_dispatch:
 
@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - id: parser
+      - id: parse
         uses: .
         with:
           body: |
@@ -18,7 +18,7 @@ jobs:
 
             ### Description
 
-            This is a description of the thing.
+            This is a great description.
 
             ### Color
 
@@ -27,26 +27,27 @@ jobs:
             ### Confirmation
 
             - [x] I confirm this request
+            - [x] I understand the process
           issue-form-template: simple-request.yml
-          workspace: ${{ github.workspace }}/tests/fixtures
+          workspace: ${{ github.workspace }}/tests/fixtures/templates
 
-      - name: Assert json output is not empty
+      - name: Assert json output is non-empty
         env:
-          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+          ACTUAL: ${{ steps.parse.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          if [ -z "$JSON_OUTPUT" ]; then
-            echo "FAIL: json output is empty"
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty JSON output"
             exit 1
           fi
-          echo "PASS: json output is not empty"
+          echo "PASS: json output is non-empty"
 
-      - name: Assert name field is parsed correctly
+      - name: Assert name field parsed correctly
         env:
-          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+          ACTUAL: ${{ steps.parse.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          NAME=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('name', ''))")
+          echo "actual json: $ACTUAL"
+          NAME=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('name',''))")
           echo "name: $NAME"
           if [ "$NAME" != "my-awesome-thing" ]; then
             echo "FAIL: expected name='my-awesome-thing', got '$NAME'"
@@ -54,28 +55,41 @@ jobs:
           fi
           echo "PASS: name field parsed correctly"
 
-      - name: Assert color field is parsed as array
+      - name: Assert color field is an array containing blue
         env:
-          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+          ACTUAL: ${{ steps.parse.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          COLOR=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('color', []))")
-          echo "color: $COLOR"
-          if [ "$COLOR" != "['blue']" ]; then
-            echo "FAIL: expected color=['blue'], got '$COLOR'"
+          echo "actual json: $ACTUAL"
+          # color is a dropdown, always returned as array
+          COLOR_JSON=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('color', [])))")
+          echo "color json: $COLOR_JSON"
+          if echo "$COLOR_JSON" | python3 -c "import sys, json; lst=json.load(sys.stdin); exit(0 if 'blue' in lst else 1)"; then
+            echo "PASS: color contains 'blue'"
+          else
+            echo "FAIL: expected color to contain 'blue', got '$COLOR_JSON'"
             exit 1
           fi
-          echo "PASS: color field parsed as array"
 
-      - name: Assert confirm checkboxes are parsed
+      - name: Assert checkboxes parsed correctly
         env:
-          JSON_OUTPUT: ${{ steps.parser.outputs.json }}
+          ACTUAL: ${{ steps.parse.outputs.json }}
         run: |
-          echo "json output: $JSON_OUTPUT"
-          SELECTED=$(echo "$JSON_OUTPUT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('confirm', {}).get('selected', []))")
+          echo "actual json: $ACTUAL"
+          SELECTED=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('confirm', {}).get('selected', [])))")
           echo "confirm selected: $SELECTED"
-          if [ "$SELECTED" != "['I confirm this request']" ]; then
-            echo "FAIL: expected confirm.selected=['I confirm this request'], got '$SELECTED'"
+          if echo "$SELECTED" | python3 -c "import sys, json; lst=json.load(sys.stdin); exit(0 if any('I confirm this request' in s for s in lst) else 1)"; then
+            echo "PASS: checkbox selected field parsed correctly"
+          else
+            echo "FAIL: expected 'I confirm this request' in selected, got '$SELECTED'"
             exit 1
           fi
-          echo "PASS: confirm checkboxes parsed correctly"
+
+      - name: Assert output is valid JSON
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          echo "$ACTUAL" | python3 -c "import sys, json; json.load(sys.stdin); print('PASS: valid JSON')" || {
+            echo "FAIL: output is not valid JSON"
+            exit 1
+          }

@@ -1,0 +1,73 @@
+name: Test optional fields with no response
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: parse
+        uses: .
+        with:
+          body: |
+            ### Project Name
+
+            my-project
+
+            ### Notes
+
+            _No response_
+          issue-form-template: minimal-request.yml
+          workspace: ${{ github.workspace }}/tests/fixtures/templates
+
+      - name: Assert json output is non-empty
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty JSON output"
+            exit 1
+          fi
+          echo "PASS: json output is non-empty"
+
+      - name: Assert output is valid JSON
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          echo "$ACTUAL" | python3 -c "import sys, json; json.load(sys.stdin); print('PASS: valid JSON')" || {
+            echo "FAIL: output is not valid JSON"
+            exit 1
+          }
+
+      - name: Assert project-name field parsed correctly
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          NAME=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('project-name',''))")
+          echo "project-name: $NAME"
+          if [ "$NAME" != "my-project" ]; then
+            echo "FAIL: expected project-name='my-project', got '$NAME'"
+            exit 1
+          fi
+          echo "PASS: project-name field parsed correctly"
+
+      - name: Assert optional notes field is empty string for _No response_
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          # _No response_ should result in empty string value per format.ts
+          NOTES=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); v=d.get('notes', None); print('' if v is None else str(v))")
+          echo "notes: '$NOTES'"
+          # formatValue returns '' for _No response_ in textarea fields
+          if [ -z "$NOTES" ] || [ "$NOTES" = "None" ] || [ "$NOTES" = "null" ]; then
+            echo "PASS: optional notes field is empty/null as expected"
+          else
+            echo "FAIL: expected notes to be empty/null for '_No response_', got '$NOTES'"
+            exit 1
+          fi

@@ -1,0 +1,21 @@
+name: Minimal Request
+description: A minimal request form
+title: '[Request] Minimal'
+
+body:
+  - type: input
+    id: project-name
+    attributes:
+      label: Project Name
+      description: The name of the project.
+      placeholder: my-project
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Any additional notes.
+      placeholder: Add notes here
+    validations:
+      required: false

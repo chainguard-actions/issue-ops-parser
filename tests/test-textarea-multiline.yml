@@ -1,0 +1,89 @@
+name: Test textarea multiline content parsing
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: parse
+        uses: .
+        with:
+          body: |
+            ### Project Name
+
+            my-multiline-project
+
+            ### Notes
+
+            Line one of notes.
+
+            Line two of notes.
+
+            Line three of notes.
+          issue-form-template: minimal-request.yml
+          workspace: ${{ github.workspace }}/tests/fixtures/templates
+
+      - name: Assert json output is non-empty
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty JSON output"
+            exit 1
+          fi
+          echo "PASS: json output is non-empty"
+
+      - name: Assert output is valid JSON
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          echo "$ACTUAL" | python3 -c "import sys, json; json.load(sys.stdin); print('PASS: valid JSON')" || {
+            echo "FAIL: output is not valid JSON"
+            exit 1
+          }
+
+      - name: Assert project-name parsed correctly
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          NAME=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('project-name',''))")
+          echo "project-name: $NAME"
+          if [ "$NAME" != "my-multiline-project" ]; then
+            echo "FAIL: expected project-name='my-multiline-project', got '$NAME'"
+            exit 1
+          fi
+          echo "PASS: project-name parsed correctly"
+
+      - name: Assert notes textarea contains multiline content
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          NOTES=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('notes',''))")
+          echo "notes: $NOTES"
+          if echo "$NOTES" | grep -q "Line one"; then
+            echo "PASS: multiline textarea content parsed correctly"
+          else
+            echo "FAIL: expected multiline content in notes, got '$NOTES'"
+            exit 1
+          fi
+
+      - name: Assert notes contains multiple lines
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual json: $ACTUAL"
+          NOTES=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('notes',''))")
+          echo "notes: $NOTES"
+          if echo "$NOTES" | grep -q "Line two"; then
+            echo "PASS: second line of notes found"
+          else
+            echo "FAIL: expected 'Line two' in notes, got '$NOTES'"
+            exit 1
+          fi

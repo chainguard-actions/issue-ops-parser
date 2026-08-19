@@ -1,0 +1,43 @@
+name: Simple Request
+description: Submit a simple request
+title: '[Request] Simple'
+
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: The name of the thing.
+      placeholder: my-thing
+    validations:
+      required: true
+  - type: input
+    id: description
+    attributes:
+      label: Description
+      description: A short description.
+      placeholder: Describe the thing
+    validations:
+      required: false
+  - type: dropdown
+    id: color
+    attributes:
+      label: Color
+      description: Pick a color.
+      multiple: false
+      options:
+        - red
+        - green
+        - blue
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      description: Please confirm.
+      options:
+        - label: I confirm this request
+          required: true
+        - label: I understand the process
+          required: false

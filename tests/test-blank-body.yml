@@ -1,0 +1,46 @@
+name: Test issue body with no matching sections
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: parse
+        uses: .
+        with:
+          body: |
+            This body has no matching ### sections for the template fields.
+            It is not blank but contains no parseable form data.
+          issue-form-template: minimal-request.yml
+          workspace: ${{ github.workspace }}/tests/fixtures/templates
+
+      - name: Assert json output is valid JSON
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual: '$ACTUAL'"
+          if [ -z "$ACTUAL" ]; then
+            echo "PASS: no matching sections produces empty output"
+          else
+            # If non-empty, it must be valid JSON
+            echo "$ACTUAL" | python3 -c "import sys, json; json.load(sys.stdin); print('PASS: produces valid JSON')" || {
+              echo "FAIL: output is not valid JSON"
+              exit 1
+            }
+          fi
+
+      - name: Assert output is empty object or empty
+        env:
+          ACTUAL: ${{ steps.parse.outputs.json }}
+        run: |
+          echo "actual: '$ACTUAL'"
+          NORM="$(echo "$ACTUAL" | tr -d '[:space:]')"
+          if [ -z "$NORM" ] || [ "$NORM" = "{}" ]; then
+            echo "PASS: body with no matching sections produces empty/empty-object output"
+          else
+            echo "FAIL: expected empty or '{}' output, got '$ACTUAL'"
+            exit 1
+          fi
