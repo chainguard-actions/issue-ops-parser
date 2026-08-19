@@ -1,0 +1,81 @@
+name: Test parsing with issue form template
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### Project Name
+
+            my-awesome-project
+
+            ### Environment
+
+            production
+
+            ### Description
+
+            This is a test description.
+
+            ### Confirmation
+
+            - [x] I have read the documentation
+            - [ ] I understand the risks
+          issue-form-template: test-template.yml
+          workspace: ${{ github.workspace }}/tests/fixtures
+
+      - name: Assert json output is non-empty
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          if [ -z "$JSON_OUT" ]; then
+            echo "FAIL: json output is empty"
+            exit 1
+          fi
+          echo "PASS: json output is non-empty"
+
+      - name: Assert project-name key uses template id
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          VALUE=$(echo "$JSON_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('project-name','__missing__'))")
+          echo "project-name: $VALUE"
+          if [ "$VALUE" != "my-awesome-project" ]; then
+            echo "FAIL: expected project-name='my-awesome-project', got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert environment key uses template id
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          VALUE=$(echo "$JSON_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('environment','__missing__'))")
+          echo "environment: $VALUE"
+          if [ "$VALUE" != "production" ]; then
+            echo "FAIL: expected environment='production', got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert confirmed checkboxes are parsed as object
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          SELECTED=$(echo "$JSON_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); c=d.get('confirmed',{}); print(json.dumps(c.get('selected',[])))")
+          echo "confirmed.selected: $SELECTED"
+          if ! echo "$SELECTED" | python3 -c "import sys,json; v=json.load(sys.stdin); assert 'I have read the documentation' in v, f'not found in {v}'"; then
+            echo "FAIL: expected 'I have read the documentation' in confirmed.selected"
+            exit 1
+          fi
+          echo "PASS"

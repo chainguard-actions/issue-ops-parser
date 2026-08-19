@@ -1,0 +1,62 @@
+name: Test parsing with no-response optional fields
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### Required Field
+
+            some-value
+
+            ### Optional Field
+
+            _No response_
+          workspace: ${{ github.workspace }}
+
+      - name: Assert json output is valid JSON
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          if [ -z "$JSON_OUT" ]; then
+            echo "FAIL: json output is empty"
+            exit 1
+          fi
+          echo "$JSON_OUT" | python3 -c "import sys,json; json.load(sys.stdin)" || {
+            echo "FAIL: json output is not valid JSON"
+            exit 1
+          }
+          echo "PASS: json output is valid JSON"
+
+      - name: Assert required_field is parsed correctly
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          VALUE=$(echo "$JSON_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('required_field','__missing__'))")
+          echo "required_field: $VALUE"
+          if [ "$VALUE" != "some-value" ]; then
+            echo "FAIL: expected required_field='some-value', got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert optional_field is present in output
+        env:
+          JSON_OUT: ${{ steps.action.outputs.json }}
+        run: |
+          # The optional field with _No response_ should still appear in the JSON
+          HAS_KEY=$(echo "$JSON_OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if 'optional_field' in d else 'no')")
+          echo "has optional_field key: $HAS_KEY"
+          if [ "$HAS_KEY" != "yes" ]; then
+            echo "FAIL: expected optional_field key to be present in JSON output"
+            exit 1
+          fi
+          echo "PASS"
