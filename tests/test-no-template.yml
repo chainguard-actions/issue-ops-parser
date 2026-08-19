@@ -1,0 +1,63 @@
+name: Test parse issue body without template
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### Your Name
+
+            Jane Doe
+
+            ### Project Name
+
+            my-project
+
+            ### Description
+
+            This is a test request.
+          workspace: ${{ github.workspace }}
+
+      - name: Assert JSON output is non-empty
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty JSON output"
+            exit 1
+          fi
+          echo "PASS: JSON output is non-empty"
+
+      - name: Assert JSON contains your_name key
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          VALUE=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('your_name','MISSING'))")
+          echo "your_name value: $VALUE"
+          if [ "$VALUE" = "MISSING" ] || [ "$VALUE" != "Jane Doe" ]; then
+            echo "FAIL: expected 'Jane Doe' for your_name, got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert JSON contains project_name key
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          VALUE=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('project_name','MISSING'))")
+          echo "project_name value: $VALUE"
+          if [ "$VALUE" = "MISSING" ] || [ "$VALUE" != "my-project" ]; then
+            echo "FAIL: expected 'my-project' for project_name, got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"

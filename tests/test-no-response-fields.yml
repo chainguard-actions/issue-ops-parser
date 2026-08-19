@@ -1,0 +1,61 @@
+name: Test - Parse issue body with no-response fields
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: parser
+        uses: .
+        with:
+          body: |
+            ### Required Field
+
+            some-value
+
+            ### Optional Field
+
+            _No response_
+
+          workspace: ${{ github.workspace }}
+
+      - name: Assert json output is not empty
+        env:
+          JSON_OUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          if [ -z "$JSON_OUT" ]; then
+            echo "FAIL: json output is empty"
+            exit 1
+          fi
+          echo "PASS: json output is not empty"
+
+      - name: Assert required_field has value
+        env:
+          JSON_OUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          VAL=$(echo "$JSON_OUT" | jq -r '.required_field // "MISSING"')
+          echo "required_field: $VAL"
+          if [ "$VAL" != "some-value" ]; then
+            echo "FAIL: expected required_field='some-value', got '$VAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert optional_field contains no-response value
+        env:
+          JSON_OUT: ${{ steps.parser.outputs.json }}
+        run: |
+          echo "json output: $JSON_OUT"
+          # Without a template, _No response_ is kept as-is (no type info to convert it)
+          VAL=$(echo "$JSON_OUT" | jq -r '.optional_field // "MISSING"')
+          echo "optional_field: $VAL"
+          if [ "$VAL" != "_No response_" ]; then
+            echo "FAIL: expected optional_field='_No response_', got '$VAL'"
+            exit 1
+          fi
+          echo "PASS"

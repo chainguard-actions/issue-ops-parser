@@ -1,0 +1,39 @@
+name: Simple Request
+description: Submit a simple request
+title: '[Request] Simple'
+
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Your Name
+      description: What is your name?
+      placeholder: Jane Doe
+    validations:
+      required: true
+  - type: input
+    id: project
+    attributes:
+      label: Project Name
+      description: What project is this for?
+      placeholder: my-project
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe your request.
+      placeholder: I need...
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      description: Please confirm.
+      options:
+        - label: I agree
+          required: true
+        - label: I disagree
+          required: false

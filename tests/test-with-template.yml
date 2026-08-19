@@ -1,0 +1,82 @@
+name: Test parse issue body with template
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: |
+            ### Your Name
+
+            Jane Doe
+
+            ### Project Name
+
+            my-project
+
+            ### Description
+
+            This is a test request.
+
+            ### Confirmation
+
+            - [x] I agree
+            - [ ] I disagree
+          issue-form-template: simple-request.yml
+          workspace: ${{ github.workspace }}/tests/fixtures
+
+      - name: Assert JSON output is non-empty
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty JSON output"
+            exit 1
+          fi
+          echo "PASS: JSON output is non-empty"
+
+      - name: Assert JSON uses template IDs as keys (name key)
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          VALUE=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('name','MISSING'))")
+          echo "name value: $VALUE"
+          if [ "$VALUE" = "MISSING" ] || [ "$VALUE" != "Jane Doe" ]; then
+            echo "FAIL: expected 'Jane Doe' for name, got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert JSON uses template IDs as keys (project key)
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          VALUE=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('project','MISSING'))")
+          echo "project value: $VALUE"
+          if [ "$VALUE" = "MISSING" ] || [ "$VALUE" != "my-project" ]; then
+            echo "FAIL: expected 'my-project' for project, got '$VALUE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert checkboxes are parsed as objects
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          CONFIRM_TYPE=$(echo "$ACTUAL" | python3 -c "import sys, json; d=json.load(sys.stdin); print(type(d.get('confirm','')).__name__)")
+          echo "confirm type: $CONFIRM_TYPE"
+          if [ "$CONFIRM_TYPE" != "dict" ] && [ "$CONFIRM_TYPE" != "list" ]; then
+            echo "FAIL: confirm field is not a dict or list, got type '$CONFIRM_TYPE'"
+            exit 1
+          fi
+          echo "PASS: checkboxes parsed correctly as $CONFIRM_TYPE"

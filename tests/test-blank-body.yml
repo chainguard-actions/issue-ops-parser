@@ -1,0 +1,29 @@
+name: Test parse blank issue body
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          body: 'no headers here'
+          workspace: ${{ github.workspace }}
+
+      - name: Assert JSON output is empty object or empty
+        env:
+          ACTUAL: ${{ steps.action.outputs.json }}
+        run: |
+          echo "actual: $ACTUAL"
+          NORM="$(echo "$ACTUAL" | tr -d '[:space:]')"
+          echo "normalized: $NORM"
+          if [ -z "$NORM" ] || [ "$NORM" = "{}" ] || [ "$NORM" = "null" ]; then
+            echo "PASS: body with no headers produces empty/null JSON"
+          else
+            echo "FAIL: expected empty JSON object '{}', got '$ACTUAL'"
+            exit 1
+          fi
